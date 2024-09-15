@@ -16,6 +16,18 @@ All data sources use the Wikipedia API to collect data. To use geolocation featu
 access token can be provided to speed up requests. These API keys are configured in the 4CAT control panel's "Settings"
 page.
 
+## Installation
+In 4CAT, navigate to the extensions folder, and check out this repository there as 'wikitools'. **Note**: the name of 
+the extensions folder **must** be `wikitools` (not `4cat-wikitools`):
+
+```shell
+cd [4cat root]
+cd extensions
+git clone https://github.com/digitalmethodsinitiative/4cat-wikitools.git wikitools
+```
+
+If you restart 4CAT, the data sources will be available. You still need to enable them via the control panel.
+
 ## Credits & license
 The 4CAT Wikipedia tools extension was developed by Stijn Peeters for the [Digital Methods 
 Initiative](https://digitalmethods.net) and is licensed under the Mozilla Public License, 2.0. Refer to the LICENSE 
