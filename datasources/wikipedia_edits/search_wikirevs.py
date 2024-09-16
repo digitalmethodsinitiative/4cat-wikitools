@@ -106,14 +106,12 @@ class SearchWikiRevisions(Search, WikipediaSearch):
         num_pages = 0
         num_revisions = 0
         for language, pages in self.normalise_pagenames(wiki_apikey, urls).items():
-            api_base = f"https://{language}.wikipedia.org/w/api.php"
-
             for page in pages:
                 num_pages += 1
 
                 # get revisions from API
                 rvlimit = self.parameters.get("rvlimit")
-                page_revisions = self.get_page_revisions(wiki_apikey, language, page, rvlimit)
+                page_revisions = self.get_revisions(wiki_apikey, language, page, rvlimit)
 
                 if not page_revisions:
                     continue

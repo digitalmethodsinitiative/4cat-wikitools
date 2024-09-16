@@ -463,7 +463,6 @@ class WikipediaSearch:
         """
         page_revisions = []
         continue_bit = {}
-        print(rvlimit)
         api_base = f"https://{language}.wikipedia.org/w/api.php"
         while len(page_revisions) < rvlimit:
             if self.interrupted:
