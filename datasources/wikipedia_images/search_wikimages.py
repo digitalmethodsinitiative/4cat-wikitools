@@ -31,7 +31,8 @@ class SearchWikiImages(BasicProcessor, WikipediaSearch):
         },
         "urls": {
             "type": UserInput.OPTION_TEXT,
-            "help": "Wikipedia URL"
+            "help": "Article URL",
+            "tooltip": "E.g. 'https://en.wikipedia.org/wiki/Man_in_Business_Suit_Levitating_emoji'"
         }
     }
 

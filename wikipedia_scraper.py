@@ -415,7 +415,7 @@ class WikipediaSearch:
 
             parsed_urls[language].add(page)
 
-        self.dataset.update_status(f"Collecting canonical article names for {len(parsed_urls):,} Wikipedia article(s).")
+        self.dataset.update_status(f"Collecting canonical article names for {len(parsed_urls):,} Wikipedia article(s)")
 
         # sort by language (so we can batch requests)
         result = {}

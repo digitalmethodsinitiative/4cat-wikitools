@@ -190,14 +190,16 @@ $(document).ready(function() {
             "help": "For a given Wikipedia article URL, retrieve a number of revisions of those pages and extract "
                     "the table of contents from the page. This allows for analysis of a page's evolution through "
                     "observation of the page's sections.\n\n"
-                    "Note that not all historical versions of a page may be available; for example, if the page has "
-                    "been deleted its contents can no longer be retrieved.\n\n"
+                    "Not all historical versions of a page may be available; for example, if the page has been deleted "
+                    "its contents can no longer be retrieved.\n\n"
                     "Note that the retrieval and parsing of historical revisions is a **slow** process, particularly "
-                    "for large articles! Make sure you know what you want before you start data collection."
+                    "for large articles! Generally, it is not recommended to collect more than 100 revisions unless "
+                    "you are quite sure you need that many."
         },
         "urls": {
             "type": UserInput.OPTION_TEXT,
-            "help": "Wikipedia URL"
+            "help": "Article URL",
+            "tooltip": "E.g. 'https://en.wikipedia.org/wiki/Man_in_Business_Suit_Levitating_emoji'"
         },
         "rvlimit": {
             "type": UserInput.OPTION_TEXT,

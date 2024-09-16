@@ -45,8 +45,9 @@ class SearchWikiRevisions(Search, WikipediaSearch):
         },
         "urls": {
             "type": UserInput.OPTION_TEXT_LARGE,
-            "help": "Wikipedia URLs",
-            "tooltip": "Put each URL on a separate line."
+            "help": "Article URLs",
+            "tooltip": "E.g. 'https://en.wikipedia.org/wiki/Man_in_Business_Suit_Levitating_emoji'. Put each URL on a "
+                       "separate line."
         },
         "geolocate": {
             "type": UserInput.OPTION_TOGGLE,
@@ -62,7 +63,7 @@ class SearchWikiRevisions(Search, WikipediaSearch):
             "type": UserInput.OPTION_TEXT_LARGE,
             "help": "Wikipedia Access Token",
             "tooltip": "API key for the Wikimedia API. With an API key, more requests can be made per minute, which "
-                       "will speed up Wikipedia-based data sources"
+                       "will speed up Wikipedia-based data sources."
         }
     }
 
@@ -142,7 +143,7 @@ class SearchWikiRevisions(Search, WikipediaSearch):
 
         if geolocator:
             geolocator.close()
-        self.dataset.update_status(f"Retrieved {num_revisions:,} revisions for {num_pages:,} page(s).", is_final=True)
+        self.dataset.update_status(f"Retrieved {num_revisions:,} revisions for {num_pages:,} page(s)", is_final=True)
 
     @staticmethod
     def validate_query(query, request, user):
