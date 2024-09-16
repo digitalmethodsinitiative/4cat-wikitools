@@ -11,10 +11,9 @@ An extension for [4CAT](https://4cat.nl) with three Wikipedia-related data sourc
 * **Wikipedia TOC scraper**: Collect the tables of contents (TOCs) of historical versions of a Wikipedia article. How 
   does the table of contents evolve over time? Which sections appear and which disappear?
 
-All data sources use the Wikipedia API to collect data. To use geolocation features, a (free) API key for the
-[Abstract](https://www.abstractapi.com/api/ip-geolocation-api) geolocation API is required. Optionally, a Wikimedia API
-access token can be provided to speed up requests. These API keys are configured in the 4CAT control panel's "Settings"
-page.
+All data sources use the Wikipedia API to collect data. An API key can be configured in the 4CAT control panel's 
+"Settings" page. Things will also work without an API key, but with a lower rate limit (meaning processors may fail 
+with heavy use).
 
 ## Installation
 In 4CAT, navigate to the extensions folder, and check out this repository there as 'wikitools'. **Note**: the name of 
