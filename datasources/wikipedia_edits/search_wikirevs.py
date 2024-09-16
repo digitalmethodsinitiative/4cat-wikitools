@@ -1,18 +1,16 @@
 """
 Collect Wikipedia revisions
 """
-import requests
+import geoip2.database
 import datetime
-import time
-import json
 import re
 
 from backend.lib.search import Search
 from extensions.wikitools.wikipedia_scraper import WikipediaSearch
 from common.lib.helpers import UserInput
 from common.lib.item_mapping import MappedItem
-from common.lib.exceptions import QueryParametersException
-
+from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from pathlib import Path
 
 class SearchWikiRevisions(Search, WikipediaSearch):
     """
@@ -39,7 +37,7 @@ class SearchWikiRevisions(Search, WikipediaSearch):
             "type": UserInput.OPTION_TEXT,
             "help": "Number of revisions",
             "min": 1,
-            "max": 500,
+            "max": 25000,
             "coerce_type": int,
             "default": 50,
             "tooltip": "Number of revisions to collect per page. Cannot be more than 500. Note that pages may have "
@@ -53,9 +51,9 @@ class SearchWikiRevisions(Search, WikipediaSearch):
         "geolocate": {
             "type": UserInput.OPTION_TOGGLE,
             "help": "Attempt to geolocate anonymous edits",
-            "tooltip": "Uses the [Abstract](https://www.abstractapi.com/api/ip-geolocation-api) API to link an IP "
-                       "address to a geographic location. Note that this makes data collection a lot slower, and that "
-                       "locations may be inaccurate and or unavailable for certain IP addresses."
+            "tooltip": "Uses the [MaxMind](https://www.maxmind.com/en/solutions/ip-geolocation-databases-api-services) "
+                       "GeoIP database to locate anonymous users based on their IP address. Note that locations may be "
+                       "inaccurate and or unavailable for certain IP addresses."
         }
     }
 
@@ -65,13 +63,27 @@ class SearchWikiRevisions(Search, WikipediaSearch):
             "help": "Wikipedia Access Token",
             "tooltip": "API key for the Wikimedia API. With an API key, more requests can be made per minute, which "
                        "will speed up Wikipedia-based data sources"
-        },
-        "api.abstract": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Abstract API Key",
-            "tooltip": "API key for Abstract, the IP geolocation API (used by the Wikipedia revisions scraper)"
         }
     }
+
+    def get_options(self, parent_dataset, user):
+        """
+        Get processor options
+
+        Only offer geolocation if a geolocation database is present.
+
+        :param DataSet parent_dataset:  Dataset that will be uploaded
+        :param User user:  User that will be uploading it
+        :return dict:  Option definition
+        """
+        options = self.options.copy()
+        geoip_database = Path(__file__).absolute().joinpath("../../../GeoLite2-City.mmdb").resolve()
+
+        if not geoip_database.exists():
+            del options["geolocate"]
+
+        return options
+
 
     def get_items(self, query):
         """
@@ -81,8 +93,12 @@ class SearchWikiRevisions(Search, WikipediaSearch):
         """
         urls = [url.strip() for url in self.parameters.get("urls").split("\n")]
         urls = [url for url in urls if url]
-        abstract_apikey = self.config.get("api.abstract")
         wiki_apikey = self.config.get("api.wikipedia")
+        geoip_database = Path(__file__).absolute().joinpath("../../../GeoLite2-City.mmdb").resolve()
+        geolocator = None
+        if geoip_database.exists():
+            geolocator = geoip2.database.Reader(geoip_database)
+
         location_cache = {}
 
         num_pages = 0
@@ -94,72 +110,52 @@ class SearchWikiRevisions(Search, WikipediaSearch):
                 num_pages += 1
 
                 # get revisions from API
-                page_revisions = self.wiki_request(wiki_apikey, api_base, params={
-                    "action": "query",
-                    "format": "json",
-                    "prop": "revisions",
-                    "rvlimit": self.parameters.get("rvlimit"),
-                    "titles": page,
-                })
+                page_revisions = []
+                continue_bit = {}
+                max_revisions = self.parameters.get("rvlimit")
+                while len(page_revisions) < max_revisions:
+                    if self.interrupted:
+                        raise ProcessorInterruptedException("Interrupted while fetching revisions")
+                    # loop because we can only get up to 500 revisions per request
+                    revisions_batch = self.wiki_request(wiki_apikey, api_base, params={
+                        "action": "query",
+                        "format": "json",
+                        "prop": "revisions",
+                        "rvlimit": max_revisions,
+                        "titles": page,
+                        **continue_bit
+                    })
+
+                    self.dataset.update_status(f"Fetching revision {len(page_revisions):,}-{min(max_revisions, len(page_revisions) + 500):,} for '{page}' ({self.map_lang(language)}/{language})")
+
+                    if not revisions_batch:
+                        self.dataset.update_status(f"Could not get revisions for {page} from Wikipedia API - skipping")
+                        break
+
+                    page_revisions += list(revisions_batch["query"]["pages"].values())[0]["revisions"]
+
+                    if revisions_batch.get("continue"):
+                        continue_bit = {"rvcontinue": revisions_batch["continue"]["rvcontinue"]}
+                    else:
+                        break
 
                 if not page_revisions:
-                    self.dataset.update_status(f"Could not get revisions for {page} from Wikipedia API - skipping")
                     continue
 
-                page_revisions = list(page_revisions["query"]["pages"].values())[0]["revisions"]
-
                 self.dataset.update_status(
-                    f"Collecting {len(page_revisions):,} revisions for article '{page}' on {language}.wikipedia.org")
+                    f"Collected {len(page_revisions):,} revisions for article '{page}' on {language}.wikipedia.org")
 
                 for revision in page_revisions:
                     location = ""
 
                     # geolocate only anonymous requests
-                    if "anon" in revision and abstract_apikey:
-                        # todo: check if IPv6 can even be geolocated by abstract
-                        # if not, just skip and save the API request
-                        location = "UNKNOWN / Geolocation service unavailable"
-                        try:
-                            # check if cached (to avoid API requests)
-                            if revision["user"] in location_cache:
-                                location = location_cache[revision["user"]]
-                                raise KeyError()  # just to skip the request
-
-                            retries = 0
-                            geo = None
-                            while retries < 3:
-                                # the rate limit is 120 per minute
-                                # this should be OK to deal with that
-                                geo = requests.get(
-                                    f"https://ipgeolocation.abstractapi.com/v1/?api_key={abstract_apikey}&ip_address={revision['user']}",
-                                    timeout=5)
-                                if geo.status_code == 429:
-                                    retries += 1
-                                    time.sleep(retries)
-                                    continue
-                                else:
-                                    break
-
-                            # still nothing? give up
-                            if not geo:
-                                raise TypeError
-
-                            # parse - annoyingly not all properties are always present
-                            geo = geo.json()
-
-                            if "region" not in geo:
-                                geo["region"] = geo["city"]  # some countries have no region
-
-                            geolocation_bits = []
-                            for component in ("continent", "country", "region", "city"):
-                                if geo.get(component):
-                                    geolocation_bits.append(geo[component])
-
-                            location = " / ".join(geolocation_bits)
+                    if "anon" in revision and geolocator:
+                        if revision["user"] in location_cache:
+                            location = location_cache[revision["user"]]
+                        else:
+                            geo = geolocator.city(revision["user"])
+                            location = f"{geo.country.iso_code} / {geo.country.name} / {geo.subdivisions.most_specific.name} / {geo.city.name}"
                             location_cache[revision["user"]] = location
-
-                        except (json.JSONDecodeError, KeyError, TypeError) as e:
-                            pass
 
                     yield {
                         "title": page,
@@ -169,6 +165,8 @@ class SearchWikiRevisions(Search, WikipediaSearch):
                     }
                     num_revisions += 1
 
+        if geolocator:
+            geolocator.close()
         self.dataset.update_status(f"Retrieved {num_revisions:,} revisions for {num_pages:,} page(s).", is_final=True)
 
     @staticmethod
@@ -213,7 +211,7 @@ class SearchWikiRevisions(Search, WikipediaSearch):
             "thread_id": item.get("parentid"),
             "page": item["title"],
             "language": item["language"],
-            "url": f"https://{item['language']}.wikipedia.org/w/index.php?title={item['title']}&oldid={item['revid']}",
+            "url": f"https://{item['language']}.wikipedia.org/w/index.php?title={item['title'].replace(' ', '_')}&oldid={item['revid']}",
             "author": item["user"],
             "author_anonymous_location": item.get("location", ""),
             "is_anonymous": "yes" if "anon" in item else "no",

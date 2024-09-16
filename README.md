@@ -28,6 +28,11 @@ git clone https://github.com/digitalmethodsinitiative/4cat-wikitools.git wikitoo
 
 If you restart 4CAT, the data sources will be available. You still need to enable them via the control panel.
 
+If you want to enable geolocation of revision authors, you need to put the `GeoLite2-City.mmdb` file from the 
+[MaxMind](https://www.maxmind.com/en/solutions/ip-geolocation-databases-api-services) GeoIP database in the folder's 
+root (i.e. `wikitools`). This file can be downloaded for free but we cannot redistribute it. More information on how to
+download this file [here](https://support.maxmind.com/hc/en-us/articles/4408216157723-Database-Formats).
+
 ## Credits & license
 The 4CAT Wikipedia tools extension was developed by Stijn Peeters for the [Digital Methods 
 Initiative](https://digitalmethods.net) and is licensed under the Mozilla Public License, 2.0. Refer to the LICENSE 

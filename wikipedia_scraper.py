@@ -391,7 +391,7 @@ class WikipediaSearch:
         for url in urls:
             domain = ural.get_hostname(url)
             if not domain.endswith("wikipedia.org"):
-                self.dataset.log(f"{url} is not a Wikipedia URL, skipping")
+                self.dataset.log(f"{url} is not a Wikipedia URL ({domain}), skipping")
                 continue
 
             if domain.startswith("www.") or len(domain.split(".")) == 2:
@@ -401,10 +401,13 @@ class WikipediaSearch:
 
             page = url.split("/wiki/")
             if len(page) < 2:
-                self.dataset.log(f"{url} is not a Wikipedia URL, skipping")
-                continue
-
-            page = page.pop().split("#")[0].split("?")[0]
+                if "/w/index.php" in url:
+                    page = url.split("title=")[1].split("&")[0]
+                else:
+                    self.dataset.log(f"{url} is not a Wikipedia URL, skipping")
+                    continue
+            else:
+                page = page.pop().split("#")[0].split("?")[0]
 
             if language not in parsed_urls:
                 parsed_urls[language] = set()
