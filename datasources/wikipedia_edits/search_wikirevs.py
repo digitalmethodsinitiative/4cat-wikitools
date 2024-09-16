@@ -66,7 +66,8 @@ class SearchWikiRevisions(Search, WikipediaSearch):
         }
     }
 
-    def get_options(self, parent_dataset, user):
+    @classmethod
+    def get_options(cls, parent_dataset=None, user=None):
         """
         Get processor options
 
@@ -76,7 +77,7 @@ class SearchWikiRevisions(Search, WikipediaSearch):
         :param User user:  User that will be uploading it
         :return dict:  Option definition
         """
-        options = self.options.copy()
+        options = cls.options.copy()
         geoip_database = Path(__file__).absolute().joinpath("../../../GeoLite2-City.mmdb").resolve()
 
         if not geoip_database.exists():
@@ -110,34 +111,8 @@ class SearchWikiRevisions(Search, WikipediaSearch):
                 num_pages += 1
 
                 # get revisions from API
-                page_revisions = []
-                continue_bit = {}
-                max_revisions = self.parameters.get("rvlimit")
-                while len(page_revisions) < max_revisions:
-                    if self.interrupted:
-                        raise ProcessorInterruptedException("Interrupted while fetching revisions")
-                    # loop because we can only get up to 500 revisions per request
-                    revisions_batch = self.wiki_request(wiki_apikey, api_base, params={
-                        "action": "query",
-                        "format": "json",
-                        "prop": "revisions",
-                        "rvlimit": max_revisions,
-                        "titles": page,
-                        **continue_bit
-                    })
-
-                    self.dataset.update_status(f"Fetching revision {len(page_revisions):,}-{min(max_revisions, len(page_revisions) + 500):,} for '{page}' ({self.map_lang(language)}/{language})")
-
-                    if not revisions_batch:
-                        self.dataset.update_status(f"Could not get revisions for {page} from Wikipedia API - skipping")
-                        break
-
-                    page_revisions += list(revisions_batch["query"]["pages"].values())[0]["revisions"]
-
-                    if revisions_batch.get("continue"):
-                        continue_bit = {"rvcontinue": revisions_batch["continue"]["rvcontinue"]}
-                    else:
-                        break
+                rvlimit = self.parameters.get("rvlimit")
+                page_revisions = self.get_page_revisions(wiki_apikey, language, page, rvlimit)
 
                 if not page_revisions:
                     continue

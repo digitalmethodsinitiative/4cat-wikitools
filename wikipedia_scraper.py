@@ -2,6 +2,7 @@ import requests
 import ural
 
 from requests.exceptions import RequestException
+from common.lib.exceptions import ProcessorInterruptedException
 
 
 class WikipediaSearch:
@@ -446,6 +447,52 @@ class WikipediaSearch:
             result[language] = canonical_titles
 
         return {lang: result[lang] for lang in result if result[lang]}
+
+    def get_revisions(self, wiki_apikey, language, page, rvlimit=500):
+        """
+        Get revisions for a given page
+
+        This requires paginating through results, so a wrapper function is
+        useful.
+
+        :param str wiki_apikey:  Wikipedia API key
+        :param str language:  Wikipedia language
+        :param str page:  Wikipedia page
+        :param int rvlimit:  Maximum number of revisions to return
+        :return list:  List of dictionaries with revision metadata
+        """
+        page_revisions = []
+        continue_bit = {}
+        print(rvlimit)
+        api_base = f"https://{language}.wikipedia.org/w/api.php"
+        while len(page_revisions) < rvlimit:
+            if self.interrupted:
+                raise ProcessorInterruptedException("Interrupted while fetching revisions")
+            # loop because we can only get up to 500 revisions per request
+            revisions_batch = self.wiki_request(wiki_apikey, api_base, params={
+                "action": "query",
+                "format": "json",
+                "prop": "revisions",
+                "rvlimit": rvlimit,
+                "titles": page,
+                **continue_bit
+            })
+
+            self.dataset.update_status(
+                f"Fetching revision {len(page_revisions):,}-{min(rvlimit, len(page_revisions) + 500):,} for '{page}' ({self.map_lang(language)}/{language})")
+
+            if not revisions_batch:
+                self.dataset.update_status(f"Could not get revisions for {page} from Wikipedia API - skipping")
+                break
+
+            page_revisions += list(revisions_batch["query"]["pages"].values())[0]["revisions"]
+
+            if revisions_batch.get("continue"):
+                continue_bit = {"rvcontinue": revisions_batch["continue"]["rvcontinue"]}
+            else:
+                break
+
+        return page_revisions
 
     def map_lang(self, code):
         """

@@ -7,7 +7,7 @@ import ural
 from extensions.wikitools.wikipedia_scraper import WikipediaSearch
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput
-from common.lib.exceptions import QueryParametersException
+from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
 
 class SearchWikiToc(BasicProcessor, WikipediaSearch):
@@ -192,8 +192,8 @@ $(document).ready(function() {
                     "observation of the page's sections.\n\n"
                     "Note that not all historical versions of a page may be available; for example, if the page has "
                     "been deleted its contents can no longer be retrieved.\n\n"
-                    "Note that te retrieval and parsing of revisions is a **slow** process! Make sure you know what "
-                    "you want before you start data collection."
+                    "Note that the retrieval and parsing of historical revisions is a **slow** process, particularly "
+                    "for large articles! Make sure you know what you want before you start data collection."
         },
         "urls": {
             "type": UserInput.OPTION_TEXT,
@@ -203,11 +203,12 @@ $(document).ready(function() {
             "type": UserInput.OPTION_TEXT,
             "help": "Number of revisions",
             "min": 1,
-            "max": 500,
+            "max": 5000,
             "coerce_type": int,
             "default": 50,
-            "tooltip": "Number of revisions to collect per page. Cannot be more than 500. Note that pages may have "
-                       "fewer revisions than the upper limit you set."
+            "tooltip": "Number of revisions to collect per page. Cannot be more than 5000. Note that pages may have "
+                       "fewer revisions than the upper limit you set. Things get quite slow when collecting more than "
+                       "100 revisions!"
         },
     }
 
@@ -231,25 +232,17 @@ $(document).ready(function() {
             tocs[language] = {}
 
             for page in pages:
-                # get most recent revisions to then parse
-                revisions = self.wiki_request(wiki_apikey, api_base, params={
-                    "action": "query",
-                    "format": "json",
-                    "prop": "revisions",
-                    "rvlimit": self.parameters.get("rvlimit"),
-                    "titles": page,
-                })
+                if self.interrupted:
+                    raise ProcessorInterruptedException("Interrupted while fetching revisions")
 
-                if not revisions:
-                    self.dataset.log(f"Skipping {page} - could not get data from Wikipedia API")
-                    continue
-
-                revisions = list(revisions["query"]["pages"].values())[0]["revisions"]
-                self.dataset.update_status(
-                    f"Collecting {len(revisions):,} revisions for article '{page}' on {language}.wikipedia.org")
+                # get most recent revisions to then parse from API
+                rvlimit = self.parameters.get("rvlimit")
                 num_parsed = 0
+                page_revisions = self.get_revisions(wiki_apikey, language, page, rvlimit)
 
-                for revision in revisions:
+                for revision in page_revisions:
+                    if self.interrupted:
+                        raise ProcessorInterruptedException("Interrupted while parsing revisions")
                     # now get the parsed version of each revision
                     # this is pretty slow, but the only way to get the TOC...
                     content = self.wiki_request(wiki_apikey, api_base, params={
@@ -265,8 +258,8 @@ $(document).ready(function() {
 
                     num_parsed += 1
                     self.dataset.update_status(
-                        f"Collecting {num_parsed:,}/{len(revisions):,} revisions for article '{page}' on {language}.wikipedia.org")
-                    self.dataset.update_progress(num_parsed / len(revisions))
+                        f"Parsing {num_parsed:,}/{len(page_revisions):,} revisions for article '{page}' ({self.map_lang(language)}/{language})")
+                    self.dataset.update_progress(num_parsed / len(page_revisions))
 
                     if page not in tocs[language]:
                         tocs[language][page] = []
@@ -312,5 +305,6 @@ $(document).ready(function() {
             raise QueryParametersException("You need to provide a valid Wikipedia URL")
 
         return {
-            "urls": query.get("urls").strip()
+            "urls": query.get("urls").strip(),
+            "rvlimit": query.get("rvlimit")
         }
