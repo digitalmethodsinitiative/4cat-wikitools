@@ -54,7 +54,7 @@ class SearchWikiRevisions(Search, WikipediaSearch):
             "help": "Attempt to geolocate anonymous edits",
             "tooltip": "Uses the [MaxMind](https://www.maxmind.com/en/solutions/ip-geolocation-databases-api-services) "
                        "GeoIP database to locate anonymous users based on their IP address. Note that locations may be "
-                       "inaccurate and or unavailable for certain IP addresses."
+                       "inaccurate and/or unavailable for certain IP addresses."
         }
     }
 
