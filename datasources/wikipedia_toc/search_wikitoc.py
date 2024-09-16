@@ -31,7 +31,7 @@ class SearchWikiToc(BasicProcessor, WikipediaSearch):
     h1, h2 { background: #363636; color: white; padding: 0.4em 0.25em 0.25em 0.25em; }
     html { font-family: sans-serif; background: white; color: #363636; }
     a { color: inherit; }
-    .meta { padding: 0.5em;
+    .meta { padding: 0.5em; }
     #toc, .toc, .mw-warning {
       border: 1px solid #aaa;
       background-color: #f9f9f9;
