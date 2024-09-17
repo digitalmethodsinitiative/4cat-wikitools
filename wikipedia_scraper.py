@@ -1,5 +1,6 @@
 import requests
 import ural
+import re
 
 from urllib.parse import unquote
 from requests.exceptions import RequestException
@@ -393,7 +394,7 @@ class WikipediaSearch:
         for url in urls:
             domain = ural.get_hostname(url)
             if not domain.endswith("wikipedia.org"):
-                self.dataset.log(f"{url} is not a Wikipedia URL ({domain}), skipping")
+                self.dataset.update_status(f"{url} is not a Wikipedia URL ({domain}), skipping")
                 continue
 
             if domain.startswith("www.") or len(domain.split(".")) == 2:
@@ -401,12 +402,13 @@ class WikipediaSearch:
             else:
                 language = domain.split(".")[0]
 
-            page = url.split("/wiki/")
-            if len(page) < 2:
+            # apparently chinese wiki has URLs along the lines of https://zh.wikipedia.org/zh-hans/%F0%9F%8D%91
+            page = re.split(r"\/(wiki|zh.*)\/", url)
+            if len(page) < 3:
                 if "/w/index.php" in url:
                     page = url.split("title=")[1].split("&")[0]
                 else:
-                    self.dataset.log(f"{url} is not a Wikipedia URL, skipping")
+                    self.dataset.update_status(f"{url} is not a Wikipedia URL, skipping")
                     continue
             else:
                 page = page.pop().split("#")[0].split("?")[0]
