@@ -1,6 +1,7 @@
 import requests
 import ural
 
+from urllib.parse import unquote
 from requests.exceptions import RequestException
 from common.lib.exceptions import ProcessorInterruptedException
 
@@ -413,7 +414,7 @@ class WikipediaSearch:
             if language not in parsed_urls:
                 parsed_urls[language] = set()
 
-            parsed_urls[language].add(page)
+            parsed_urls[language].add(unquote(page))
 
         self.dataset.update_status(f"Collecting canonical article names for {len(parsed_urls):,} Wikipedia article(s)")
 
