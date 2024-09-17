@@ -484,7 +484,13 @@ class WikipediaSearch:
                 self.dataset.update_status(f"Could not get revisions for {page} from Wikipedia API - skipping")
                 break
 
-            page_revisions += list(revisions_batch["query"]["pages"].values())[0]["revisions"]
+            for page_id, page_details in revisions_batch["query"]["pages"].items():
+                if page_id == "-1":
+                    reason = page_details.get("invalidreason", "unknown error")
+                    self.dataset.update_status(f"Could not fetch revisions for page {page} (Wikipedia said: '{reason}') - halting. Double-check the URL and try again.", is_final=True)
+                    return []
+
+                page_revisions += page_details["revisions"]
 
             if revisions_batch.get("continue"):
                 continue_bit = {"rvcontinue": revisions_batch["continue"]["rvcontinue"]}
