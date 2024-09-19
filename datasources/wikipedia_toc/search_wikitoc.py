@@ -1,19 +1,24 @@
 """
 Collect Wikipedia tables of content revisions
 """
+
 import json
 import ural
 
 from extensions.wikitools.wikipedia_scraper import WikipediaSearch
 from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput
-from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from common.lib.exceptions import (
+    QueryParametersException,
+    ProcessorInterruptedException,
+)
 
 
 class SearchWikiToc(BasicProcessor, WikipediaSearch):
     """
     Collect Wikipedia TOCs
     """
+
     type = "wikitocs-search"  # job ID
     category = "Search"  # category
     title = "Wikipedia table of content scraper"  # title displayed in UI
@@ -188,18 +193,18 @@ $(document).ready(function() {
         "intro": {
             "type": UserInput.OPTION_INFO,
             "help": "For a given Wikipedia article URL, retrieve a number of revisions of those pages and extract "
-                    "the table of contents from the page. This allows for analysis of a page's evolution through "
-                    "observation of the page's sections.\n\n"
-                    "Not all historical versions of a page may be available; for example, if the page has been deleted "
-                    "its contents can no longer be retrieved.\n\n"
-                    "Note that the retrieval and parsing of historical revisions is a **slow** process, particularly "
-                    "for large articles! Generally, it is not recommended to collect more than 100 revisions unless "
-                    "you are quite sure you need that many."
+            "the table of contents from the page. This allows for analysis of a page's evolution through "
+            "observation of the page's sections.\n\n"
+            "Not all historical versions of a page may be available; for example, if the page has been deleted "
+            "its contents can no longer be retrieved.\n\n"
+            "Note that the retrieval and parsing of historical revisions is a **slow** process, particularly "
+            "for large articles! Generally, it is not recommended to collect more than 100 revisions unless "
+            "you are quite sure you need that many.",
         },
         "urls": {
             "type": UserInput.OPTION_TEXT,
             "help": "Article URL",
-            "tooltip": "E.g. 'https://en.wikipedia.org/wiki/Man_in_Business_Suit_Levitating_emoji'"
+            "tooltip": "E.g. 'https://en.wikipedia.org/wiki/Man_in_Business_Suit_Levitating_emoji'",
         },
         "rvlimit": {
             "type": UserInput.OPTION_TEXT,
@@ -209,8 +214,8 @@ $(document).ready(function() {
             "coerce_type": int,
             "default": 50,
             "tooltip": "Number of revisions to collect per page. Cannot be more than 5000. Note that pages may have "
-                       "fewer revisions than the upper limit you set. Things get quite slow when collecting more than "
-                       "100 revisions!"
+            "fewer revisions than the upper limit you set. Things get quite slow when collecting more than "
+            "100 revisions!",
         },
     }
 
@@ -235,41 +240,53 @@ $(document).ready(function() {
 
             for page in pages:
                 if self.interrupted:
-                    raise ProcessorInterruptedException("Interrupted while fetching revisions")
+                    raise ProcessorInterruptedException(
+                        "Interrupted while fetching revisions"
+                    )
 
                 # get most recent revisions to then parse from API
                 rvlimit = self.parameters.get("rvlimit")
                 num_parsed = 0
-                page_revisions = self.get_revisions(wiki_apikey, language, page, rvlimit)
+                page_revisions = self.get_revisions(
+                    wiki_apikey, language, page, rvlimit
+                )
 
                 for revision in page_revisions:
                     if self.interrupted:
-                        raise ProcessorInterruptedException("Interrupted while parsing revisions")
+                        raise ProcessorInterruptedException(
+                            "Interrupted while parsing revisions"
+                        )
                     # now get the parsed version of each revision
                     # this is pretty slow, but the only way to get the TOC...
-                    content = self.wiki_request(wiki_apikey, api_base, params={
-                        "action": "parse",
-                        "format": "json",
-                        "oldid": revision["revid"],
-                        "prop": "sections|revid"
-                    })
+                    content = self.wiki_request(
+                        wiki_apikey,
+                        api_base,
+                        params={
+                            "action": "parse",
+                            "format": "json",
+                            "oldid": revision["revid"],
+                            "prop": "sections|revid",
+                        },
+                    )
 
                     if not content:
-                        self.dataset.log(f"Skipping revision {revision['revid']} - could not get data from Wikipedia API")
+                        self.dataset.log(
+                            f"Skipping revision {revision['revid']} - could not get data from Wikipedia API"
+                        )
                         continue
 
                     num_parsed += 1
                     self.dataset.update_status(
-                        f"Parsing {num_parsed:,}/{len(page_revisions):,} revisions for article '{page}' ({self.map_lang(language)}/{language})")
+                        f"Parsing {num_parsed:,}/{len(page_revisions):,} revisions for article '{page}' ({self.map_lang(language)}/{language})"
+                    )
                     self.dataset.update_progress(num_parsed / len(page_revisions))
 
                     if page not in tocs[language]:
                         tocs[language][page] = []
 
-                    tocs[language][page].append({
-                        **revision,
-                        "entries": content["parse"]["sections"]
-                    })
+                    tocs[language][page].append(
+                        {**revision, "entries": content["parse"]["sections"]}
+                    )
 
         # OK, we have our data, let's render it
         num_results = 0
@@ -279,7 +296,7 @@ $(document).ready(function() {
                 embedded_json = {
                     "title": page,
                     "lang": language,
-                    "revisions": revisions
+                    "revisions": revisions,
                 }
                 num_results += len(revisions)
                 break
@@ -306,7 +323,4 @@ $(document).ready(function() {
         if not query.get("urls").strip():
             raise QueryParametersException("You need to provide a valid Wikipedia URL")
 
-        return {
-            "urls": query.get("urls").strip(),
-            "rvlimit": query.get("rvlimit")
-        }
+        return {"urls": query.get("urls").strip(), "rvlimit": query.get("rvlimit")}

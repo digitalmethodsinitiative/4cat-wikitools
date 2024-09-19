@@ -1,6 +1,7 @@
 """
 Collect Wikipedia revisions
 """
+
 import geoip2.database
 import datetime
 import re
@@ -9,17 +10,24 @@ from backend.lib.search import Search
 from extensions.wikitools.wikipedia_scraper import WikipediaSearch
 from common.lib.helpers import UserInput
 from common.lib.item_mapping import MappedItem
-from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from common.lib.exceptions import (
+    QueryParametersException,
+    ProcessorInterruptedException,
+)
 from pathlib import Path
+
 
 class SearchWikiRevisions(Search, WikipediaSearch):
     """
     Scrape Wikipedia article revisions
     """
+
     type = "wikirevs-search"  # job ID
     category = "Search"  # category
     title = "Wikipedia revisions scraper"  # title displayed in UI
-    description = "Retrieve metadata for Wikipedia revisions."  # description displayed in UI
+    description = (
+        "Retrieve metadata for Wikipedia revisions."  # description displayed in UI
+    )
     extension = "ndjson"  # extension of result file, used internally and in UI
 
     # not available as a processor for existing datasets
@@ -29,9 +37,9 @@ class SearchWikiRevisions(Search, WikipediaSearch):
         "intro": {
             "type": UserInput.OPTION_INFO,
             "help": "For a given list of Wikipedia page URLs, retrieve a number of revisions of those pages and their"
-                    "metadata. This allows for analysis of how actively an article is edited, and by whom.\n\n"
-                    "Note that not all historical versions of a page may be available; for example, if the page has "
-                    "been deleted its contents can no longer be retrieved."
+            "metadata. This allows for analysis of how actively an article is edited, and by whom.\n\n"
+            "Note that not all historical versions of a page may be available; for example, if the page has "
+            "been deleted its contents can no longer be retrieved.",
         },
         "rvlimit": {
             "type": UserInput.OPTION_TEXT,
@@ -41,21 +49,21 @@ class SearchWikiRevisions(Search, WikipediaSearch):
             "coerce_type": int,
             "default": 50,
             "tooltip": "Number of revisions to collect per page. Cannot be more than 500. Note that pages may have "
-                       "fewer revisions than the upper limit you set."
+            "fewer revisions than the upper limit you set.",
         },
         "urls": {
             "type": UserInput.OPTION_TEXT_LARGE,
             "help": "Article URLs",
             "tooltip": "E.g. 'https://en.wikipedia.org/wiki/Man_in_Business_Suit_Levitating_emoji'. Put each URL on a "
-                       "separate line."
+            "separate line.",
         },
         "geolocate": {
             "type": UserInput.OPTION_TOGGLE,
             "help": "Attempt to geolocate anonymous edits",
             "tooltip": "Uses the [MaxMind](https://www.maxmind.com/en/solutions/ip-geolocation-databases-api-services) "
-                       "GeoIP database to locate anonymous users based on their IP address. Note that locations may be "
-                       "inaccurate and/or unavailable for certain IP addresses."
-        }
+            "GeoIP database to locate anonymous users based on their IP address. Note that locations may be "
+            "inaccurate and/or unavailable for certain IP addresses.",
+        },
     }
 
     config = {
@@ -63,7 +71,7 @@ class SearchWikiRevisions(Search, WikipediaSearch):
             "type": UserInput.OPTION_TEXT_LARGE,
             "help": "Wikipedia Access Token",
             "tooltip": "API key for the Wikimedia API. With an API key, more requests can be made per minute, which "
-                       "will speed up Wikipedia-based data sources."
+            "will speed up Wikipedia-based data sources.",
         }
     }
 
@@ -79,13 +87,14 @@ class SearchWikiRevisions(Search, WikipediaSearch):
         :return dict:  Option definition
         """
         options = cls.options.copy()
-        geoip_database = Path(__file__).absolute().joinpath("../../../GeoLite2-City.mmdb").resolve()
+        geoip_database = (
+            Path(__file__).absolute().joinpath("../../../GeoLite2-City.mmdb").resolve()
+        )
 
         if not geoip_database.exists():
             del options["geolocate"]
 
         return options
-
 
     def get_items(self, query):
         """
@@ -96,7 +105,9 @@ class SearchWikiRevisions(Search, WikipediaSearch):
         urls = [url.strip() for url in self.parameters.get("urls").split("\n")]
         urls = [url for url in urls if url]
         wiki_apikey = self.config.get("api.wikipedia")
-        geoip_database = Path(__file__).absolute().joinpath("../../../GeoLite2-City.mmdb").resolve()
+        geoip_database = (
+            Path(__file__).absolute().joinpath("../../../GeoLite2-City.mmdb").resolve()
+        )
         geolocator = None
         if geoip_database.exists():
             geolocator = geoip2.database.Reader(geoip_database)
@@ -111,13 +122,16 @@ class SearchWikiRevisions(Search, WikipediaSearch):
 
                 # get revisions from API
                 rvlimit = self.parameters.get("rvlimit")
-                page_revisions = self.get_revisions(wiki_apikey, language, page, rvlimit)
+                page_revisions = self.get_revisions(
+                    wiki_apikey, language, page, rvlimit
+                )
 
                 if not page_revisions:
                     continue
 
                 self.dataset.update_status(
-                    f"Collected {len(page_revisions):,} revisions for article '{page}' on {language}.wikipedia.org")
+                    f"Collected {len(page_revisions):,} revisions for article '{page}' on {language}.wikipedia.org"
+                )
 
                 for revision in page_revisions:
                     location = ""
@@ -135,13 +149,16 @@ class SearchWikiRevisions(Search, WikipediaSearch):
                         "title": page,
                         "language": language,
                         "location": location,
-                        **revision
+                        **revision,
                     }
                     num_revisions += 1
 
         if geolocator:
             geolocator.close()
-        self.dataset.update_status(f"Retrieved {num_revisions:,} revisions for {num_pages:,} page(s)", is_final=True)
+        self.dataset.update_status(
+            f"Retrieved {num_revisions:,} revisions for {num_pages:,} page(s)",
+            is_final=True,
+        )
 
     @staticmethod
     def validate_query(query, request, user):
@@ -157,12 +174,14 @@ class SearchWikiRevisions(Search, WikipediaSearch):
         :return dict:  Safe query parameters
         """
         if not query.get("urls").strip():
-            raise QueryParametersException("You need to provide at least one Wikipedia article URL")
+            raise QueryParametersException(
+                "You need to provide at least one Wikipedia article URL"
+            )
 
         return {
             "urls": query.get("urls").strip(),
             "rvlimit": query.get("rvlimit"),
-            "geolocate": query.get("geolocate")
+            "geolocate": query.get("geolocate"),
         }
 
     @staticmethod
@@ -180,19 +199,23 @@ class SearchWikiRevisions(Search, WikipediaSearch):
             # this is not foolproof, but a nice extra bit of info
             section = re.findall(r"/\* (.*) \*/", item["comment"])[0]
 
-        return MappedItem({
-            "id": item["revid"],
-            "thread_id": item.get("parentid"),
-            "page": item["title"],
-            "language": item["language"],
-            "url": f"https://{item['language']}.wikipedia.org/w/index.php?title={item['title'].replace(' ', '_')}&oldid={item['revid']}",
-            "author": item["user"],
-            "author_anonymous_location": item.get("location", ""),
-            "is_anonymous": "yes" if "anon" in item else "no",
-            "is_minor_edit": "yes" if "minor" in item else "no",
-            "is_probably_bot": "yes" if item["user"].lower().endswith("bot") else "no", # not foolproof, still useful
-            "timestamp": timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-            "section": section,
-            "body": item.get("comment", ""),
-            "unix_timestamp": int(timestamp.timestamp())
-        })
+        return MappedItem(
+            {
+                "id": item["revid"],
+                "thread_id": item.get("parentid"),
+                "page": item["title"],
+                "language": item["language"],
+                "url": f"https://{item['language']}.wikipedia.org/w/index.php?title={item['title'].replace(' ', '_')}&oldid={item['revid']}",
+                "author": item["user"],
+                "author_anonymous_location": item.get("location", ""),
+                "is_anonymous": "yes" if "anon" in item else "no",
+                "is_minor_edit": "yes" if "minor" in item else "no",
+                "is_probably_bot": (
+                    "yes" if item["user"].lower().endswith("bot") else "no"
+                ),  # not foolproof, still useful
+                "timestamp": timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                "section": section,
+                "body": item.get("comment", ""),
+                "unix_timestamp": int(timestamp.timestamp()),
+            }
+        )

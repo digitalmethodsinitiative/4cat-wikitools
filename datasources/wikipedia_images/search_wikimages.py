@@ -1,9 +1,13 @@
 """
 Collect Wikipedia images
 """
+
 from backend.lib.processor import BasicProcessor
 from extensions.wikitools.wikipedia_scraper import WikipediaSearch
-from common.lib.exceptions import QueryParametersException
+from common.lib.exceptions import (
+    QueryParametersException,
+    QueryNeedsExplicitConfirmationException,
+)
 from common.lib.helpers import UserInput
 
 from bs4 import BeautifulSoup
@@ -13,6 +17,7 @@ class SearchWikiImages(BasicProcessor, WikipediaSearch):
     """
     Scrape Wikipedia images
     """
+
     type = "wikimages-search"  # job ID
     category = "Search"  # category
     title = "Wikipedia Cross-Lingual Image Analysis"  # title displayed in UI
@@ -26,14 +31,14 @@ class SearchWikiImages(BasicProcessor, WikipediaSearch):
         "intro": {
             "type": UserInput.OPTION_INFO,
             "help": "For a given Wikipedia URL, retrieve all other languages that article exists in, and then all "
-                    "images used on all language versions of that article. Images are displayed side by side to allow "
-                    "for visual comparison of the articles, in the order they appear in in the original article."
+            "images used on all language versions of that article. Images are displayed side by side to allow "
+            "for visual comparison of the articles, in the order they appear in in the original article.",
         },
         "urls": {
             "type": UserInput.OPTION_TEXT,
             "help": "Article URL",
-            "tooltip": "E.g. 'https://en.wikipedia.org/wiki/Man_in_Business_Suit_Levitating_emoji'"
-        }
+            "tooltip": "E.g. 'https://en.wikipedia.org/wiki/Man_in_Business_Suit_Levitating_emoji'",
+        },
     }
 
     def process(self):
@@ -84,11 +89,14 @@ class SearchWikiImages(BasicProcessor, WikipediaSearch):
             languages = self.wiki_request(wiki_apikey, lang_api)
             if not languages:
                 self.dataset.update_status(
-                    f"Cannot get language versions for page {page} - may not exist, skipping")
+                    f"Cannot get language versions for page {page} - may not exist, skipping"
+                )
                 continue
 
             languages.insert(0, {"title": page, "code": language})
-            self.dataset.update_status(f"Found {len(languages)} language versions for Wikipedia page {page}")
+            self.dataset.update_status(
+                f"Found {len(languages)} language versions for Wikipedia page {page}"
+            )
 
             languages_done = 0
             for language_version in languages:
@@ -98,20 +106,23 @@ class SearchWikiImages(BasicProcessor, WikipediaSearch):
 
                 api_base = f"https://{page_language}.wikipedia.org/w/api.php"
                 languages_done += 1
-                self.dataset.update_status(f"Getting images for article {page} ({self.map_lang(page_language)}/{page_language})")
+                self.dataset.update_status(
+                    f"Getting images for article {page} ({self.map_lang(page_language)}/{page_language})"
+                )
                 self.dataset.update_progress(languages_done / len(languages))
 
                 # get the image URLs from the page source
                 # since that is the most reliable source of image order
-                image_urls = self.wiki_request(wiki_apikey, api_base, params={
-                    "action": "parse",
-                    "page": page,
-                    "format": "json"
-                })
+                image_urls = self.wiki_request(
+                    wiki_apikey,
+                    api_base,
+                    params={"action": "parse", "page": page, "format": "json"},
+                )
 
                 if not image_urls:
                     self.dataset.update_status(
-                        f"Cannot get images for article {page} for language '{page_language}' - skipping")
+                        f"Cannot get images for article {page} for language '{page_language}' - skipping"
+                    )
                     continue
 
                 all_languages.append(page_language)
@@ -155,12 +166,15 @@ class SearchWikiImages(BasicProcessor, WikipediaSearch):
             html += f'<th><a href="https://{language}.wikipedia.org"><span title="{self.map_lang(language)}">{language}</span></a></th>'
         html += "</tr>"
 
-        image_map = {k: image_map[k] for k in sorted(image_map, key=lambda v: len(image_map[v]), reverse=True)}
+        image_map = {
+            k: image_map[k]
+            for k in sorted(image_map, key=lambda v: len(image_map[v]), reverse=True)
+        }
 
         for image, languages in image_map.items():
             available_languages = {l.split("/")[2].split(".")[0]: l for l in languages}
             html += f'<tr><td><a href="https://{list(available_languages.keys())[0]}.wikipedia.org/wiki/File:{image}"><img src="{url_map[image]}" alt=""></a></td>'
-            html += f'<td>{len(available_languages):,}</td>'
+            html += f"<td>{len(available_languages):,}</td>"
             for language in all_languages:
                 html += "<td>"
                 if language in available_languages:
@@ -172,7 +186,6 @@ class SearchWikiImages(BasicProcessor, WikipediaSearch):
             outfile.write(html)
 
         return self.dataset.finish(num_images)
-
 
     @staticmethod
     def validate_query(query, request, user):
@@ -190,6 +203,7 @@ class SearchWikiImages(BasicProcessor, WikipediaSearch):
         if not query.get("urls").strip():
             raise QueryParametersException("You need to provide a valid Wikipedia URL")
 
-        return {
-            "urls": query.get("urls").strip()
-        }
+        urls = [url.strip() for url in query.get("urls").split("\n")]
+        urls = [[url for url in urls if url][0]]
+
+        return {"urls": query.get("urls").strip()}

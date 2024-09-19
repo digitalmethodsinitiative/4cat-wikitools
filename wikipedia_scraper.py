@@ -11,6 +11,7 @@ class WikipediaSearch:
     """
     Wikipedia scraper utility class
     """
+
     language_map = {
         "af": "Afrikaans",
         "als": "Alemannic German",
@@ -343,7 +344,7 @@ class WikipediaSearch:
         "ko": "Korean",
         "ja": "Japanese",
         "got": "Gothic",
-        "zh-classical": "Classical Chinese"
+        "zh-classical": "Classical Chinese",
     }
 
     def wiki_request(self, auth="", *args, **kwargs):
@@ -372,12 +373,15 @@ class WikipediaSearch:
 
             if "error" in result_json:
                 raise ValueError(
-                    f"Wikipedia API request failed ({result_json['error'].get('info', result_json['error'])})")
+                    f"Wikipedia API request failed ({result_json['error'].get('info', result_json['error'])})"
+                )
 
             return result_json
 
         except (ValueError, RequestException) as e:
-            self.dataset.log(f"Encountered an error interfacing with the Wikipedia API ({e})")
+            self.dataset.log(
+                f"Encountered an error interfacing with the Wikipedia API ({e})"
+            )
             return None
 
     def normalise_pagenames(self, auth, urls):
@@ -395,7 +399,9 @@ class WikipediaSearch:
         for url in urls:
             domain = ural.get_hostname(url)
             if not domain.endswith("wikipedia.org"):
-                self.dataset.update_status(f"{url} is not a Wikipedia URL ({domain}), skipping")
+                self.dataset.update_status(
+                    f"{url} is not a Wikipedia URL ({domain}), skipping"
+                )
                 continue
 
             if domain.startswith("www.") or len(domain.split(".")) == 2:
@@ -409,13 +415,17 @@ class WikipediaSearch:
                 if "/w/index.php" in url:
                     page = url.split("title=")[1].split("&")[0]
                 else:
-                    self.dataset.update_status(f"{url} is not a Wikipedia URL, skipping")
+                    self.dataset.update_status(
+                        f"{url} is not a Wikipedia URL, skipping"
+                    )
                     continue
             else:
                 page = page.pop().split("#")[0].split("?")[0]
 
             if not page.strip():
-                self.dataset.update_status(f"{url} is not a Wikipedia article URL, skipping")
+                self.dataset.update_status(
+                    f"{url} is not a Wikipedia article URL, skipping"
+                )
                 continue
 
             if language not in parsed_urls:
@@ -423,7 +433,9 @@ class WikipediaSearch:
 
             parsed_urls[language].add(unquote(page))
 
-        self.dataset.update_status(f"Collecting canonical article names for {len(parsed_urls):,} Wikipedia article(s)")
+        self.dataset.update_status(
+            f"Collecting canonical article names for {len(parsed_urls):,} Wikipedia article(s)"
+        )
 
         # sort by language (so we can batch requests)
         result = {}
@@ -433,20 +445,27 @@ class WikipediaSearch:
             canonical_titles = []
 
             self.dataset.update_status(
-                f"Collecting canonical article names for articles on {language}.wikipedia.org ({self.map_lang(language)})")
+                f"Collecting canonical article names for articles on {language}.wikipedia.org ({self.map_lang(language)})"
+            )
             # get canonical title for URL
             while pages:
                 batch = pages[:50]
                 pages = pages[50:]
-                canonical = self.wiki_request(auth, api_base, params={
-                    "action": "query",
-                    "format": "json",
-                    "redirects": "1",
-                    "titles": "|".join(batch),
-                })
+                canonical = self.wiki_request(
+                    auth,
+                    api_base,
+                    params={
+                        "action": "query",
+                        "format": "json",
+                        "redirects": "1",
+                        "titles": "|".join(batch),
+                    },
+                )
 
                 if not canonical:
-                    self.dataset.update_status("Could not get canonical name for article batch - skipping")
+                    self.dataset.update_status(
+                        "Could not get canonical name for article batch - skipping"
+                    )
                     continue
 
                 for page in canonical["query"]["pages"].values():
@@ -474,28 +493,40 @@ class WikipediaSearch:
         api_base = f"https://{language}.wikipedia.org/w/api.php"
         while len(page_revisions) < rvlimit:
             if self.interrupted:
-                raise ProcessorInterruptedException("Interrupted while fetching revisions")
+                raise ProcessorInterruptedException(
+                    "Interrupted while fetching revisions"
+                )
             # loop because we can only get up to 500 revisions per request
-            revisions_batch = self.wiki_request(wiki_apikey, api_base, params={
-                "action": "query",
-                "format": "json",
-                "prop": "revisions",
-                "rvlimit": rvlimit,
-                "titles": page,
-                **continue_bit
-            })
+            revisions_batch = self.wiki_request(
+                wiki_apikey,
+                api_base,
+                params={
+                    "action": "query",
+                    "format": "json",
+                    "prop": "revisions",
+                    "rvlimit": rvlimit,
+                    "titles": page,
+                    **continue_bit,
+                },
+            )
 
             self.dataset.update_status(
-                f"Fetching revision {len(page_revisions):,}-{min(rvlimit, len(page_revisions) + 500):,} for '{page}' ({self.map_lang(language)}/{language})")
+                f"Fetching revision {len(page_revisions):,}-{min(rvlimit, len(page_revisions) + 500):,} for '{page}' ({self.map_lang(language)}/{language})"
+            )
 
             if not revisions_batch:
-                self.dataset.update_status(f"Could not get revisions for {page} from Wikipedia API - skipping")
+                self.dataset.update_status(
+                    f"Could not get revisions for {page} from Wikipedia API - skipping"
+                )
                 break
 
             for page_id, page_details in revisions_batch["query"]["pages"].items():
                 if page_id == "-1":
                     reason = page_details.get("invalidreason", "unknown error")
-                    self.dataset.update_status(f"Could not fetch revisions for page {page} (Wikipedia said: '{reason}') - halting. Double-check the URL and try again.", is_final=True)
+                    self.dataset.update_status(
+                        f"Could not fetch revisions for page {page} (Wikipedia said: '{reason}') - halting. Double-check the URL and try again.",
+                        is_final=True,
+                    )
                     return []
 
                 page_revisions += page_details["revisions"]
