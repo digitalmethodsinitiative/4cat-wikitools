@@ -82,12 +82,12 @@ class SearchWikiImages(BasicProcessor, WikipediaSearch):
             lang_api = f"https://api.wikimedia.org/core/v1/wikipedia/{language}/page/{page.replace(' ', '_')}/links/language"
 
             languages = self.wiki_request(wiki_apikey, lang_api)
-            languages.insert(0, {"title": page, "code": language})
             if not languages:
                 self.dataset.update_status(
                     f"Cannot get language versions for page {page} - may not exist, skipping")
                 continue
 
+            languages.insert(0, {"title": page, "code": language})
             self.dataset.update_status(f"Found {len(languages)} language versions for Wikipedia page {page}")
 
             languages_done = 0
