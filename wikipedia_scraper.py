@@ -364,6 +364,7 @@ class WikipediaSearch:
 
         try:
             result = requests.get(*args, **kwargs)
+            print(result.text)
             if result.status_code != 200:
                 raise ValueError(f"Wikipedia API request failed ({result.status_code})")
 
@@ -412,6 +413,10 @@ class WikipediaSearch:
                     continue
             else:
                 page = page.pop().split("#")[0].split("?")[0]
+
+            if not page.strip():
+                self.dataset.update_status(f"{url} is not a Wikipedia article URL, skipping")
+                continue
 
             if language not in parsed_urls:
                 parsed_urls[language] = set()
