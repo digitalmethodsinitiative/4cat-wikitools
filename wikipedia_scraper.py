@@ -398,7 +398,7 @@ class WikipediaSearch:
         parsed_urls = {}
         for url in urls:
             domain = ural.get_hostname(url)
-            if not domain.endswith("wikipedia.org"):
+            if not domain or not domain.endswith("wikipedia.org"):
                 self.dataset.update_status(
                     f"{url} is not a Wikipedia URL ({domain}), skipping"
                 )
