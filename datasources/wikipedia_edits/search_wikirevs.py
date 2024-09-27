@@ -6,6 +6,8 @@ import geoip2.database
 import datetime
 import re
 
+from geoip2.errors import GeoIP2Error
+
 from backend.lib.search import Search
 from extensions.wikitools.wikipedia_scraper import WikipediaSearch
 from common.lib.helpers import UserInput
@@ -82,9 +84,8 @@ class SearchWikiRevisions(Search, WikipediaSearch):
 
         Only offer geolocation if a geolocation database is present.
 
+        :param config:
         :param DataSet parent_dataset:  Dataset that will be uploaded
-        :param User user:  User that will be uploading it
-        :return dict:  Option definition
         """
         options = cls.options.copy()
         geoip_database = (
@@ -141,9 +142,15 @@ class SearchWikiRevisions(Search, WikipediaSearch):
                         if revision["user"] in location_cache:
                             location = location_cache[revision["user"]]
                         else:
-                            geo = geolocator.city(revision["user"])
-                            location = f"{geo.country.iso_code} / {geo.country.name} / {geo.subdivisions.most_specific.name} / {geo.city.name}"
-                            location_cache[revision["user"]] = location
+                            try:
+                                geo = geolocator.city(revision["user"])
+                                location = f"{geo.country.iso_code} / {geo.country.name} / {geo.subdivisions.most_specific.name} / {geo.city.name}"
+                                location_cache[revision["user"]] = location
+                            except GeoIP2Error as e:
+                                self.dataset.log(
+                                    f"Error geolocating IP address {revision['user']}: {e}"
+                                )
+                                location = ""
 
                     yield {
                         "title": page,
