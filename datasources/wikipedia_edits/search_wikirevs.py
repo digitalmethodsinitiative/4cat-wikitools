@@ -78,7 +78,7 @@ class SearchWikiRevisions(Search, WikipediaSearch):
     }
 
     @classmethod
-    def get_options(cls, parent_dataset=None, user=None):
+    def get_options(cls, parent_dataset=None, config=None):
         """
         Get processor options
 
